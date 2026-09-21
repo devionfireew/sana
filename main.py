@@ -802,8 +802,6 @@ def add_session():
 
         if whatsapp_mode == "pairing":
             phone = request.form.get("whatsapp_phone", "").strip()
-            # Generate pairing code setup via Baileys node script or simulate session auth template
-            # Here we save session file reference and log pairing instructions
             pairing_info = {
                 "mode": "pairing_code",
                 "phone": phone,
@@ -1474,7 +1472,7 @@ def api_logs():
     combined_logs = ""
     for tid, task in data["users"][username].get("tasks", {}).items():
         pid = task.get("pid")
-        if task.get("running"] and pid and not psutil.pid_exists(pid):
+        if task.get("running") and pid and not psutil.pid_exists(pid):
             task["running"] = False
             task["pid"] = None
             save_data(data)

@@ -1481,7 +1481,7 @@ def api_logs():
     combined_logs = ""
     for tid, task in data["users"][username].get("tasks", {}).items():
         pid = task.get("pid")
-        if task.get("running"] and pid and not psutil.pid_exists(pid):
+        if task.get("running") and pid and not psutil.pid_exists(pid):
             task["running"] = False
             task["pid"] = None
             save_data(data)

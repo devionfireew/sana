@@ -6,6 +6,7 @@ import time
 import psutil
 import requests
 import re
+import sys
 
 app = Flask(__name__)
 app.secret_key = "devi_secure_secret_key_12345"
@@ -245,7 +246,7 @@ PANEL_TEMPLATE = """
                     <p>Info: <code>{{ sess.token[:30] if sess.token else 'JSON Session' }}...</code></p>
                 </div>
                 <div class="item-actions">
-                    <button class="action-btn btn-edit" onclick="openEditSessionModal('{{ sid }}', '{{ sess.name }}', '{{ sess.platform }}', `{{ sess.token }}`)">✏️</button>
+                    <button class="action-btn btn-edit" onclick="openEditSessionModal({{ sid|tojson }}, {{ sess.name|tojson }}, {{ sess.platform|tojson }}, {{ sess.token|tojson }})">✏️</button>
                     <a href="/delete_session/{{ sid }}" class="action-btn btn-del" onclick="return confirm('Delete session?')">🗑️</a>
                 </div>
             </div>
@@ -274,13 +275,13 @@ PANEL_TEMPLATE = """
                     <p style="margin-top: 2px;">State: <b style="color: {% if task.running %}#22c55e{% else %}#eab308{% endif %}">{{ 'RUNNING 🟢' if task.running else 'STOPPED 🔴' }}</b></p>
                 </div>
                 <div class="item-actions">
-                    <button class="action-btn btn-term" onclick="openTaskTerminal('{{ tid }}', '{{ task.name }}')" title="View Task Terminal">💻</button>
+                    <button class="action-btn btn-term" onclick="openTaskTerminal({{ tid|tojson }}, {{ task.name|tojson }})" title="View Task Terminal">💻</button>
                     {% if not task.running %}
                     <a href="/start_task/{{ tid }}" class="action-btn btn-play">▶️</a>
                     {% else %}
                     <a href="/stop_task/{{ tid }}" class="action-btn btn-stop">⏹️</a>
                     {% endif %}
-                    <button class="action-btn btn-edit" onclick="openEditTaskModal('{{ tid }}', '{{ task.name }}', '{{ task.session_id }}', '{{ task.action }}', '{{ task.target }}', `{{ task.messages }}`, '{{ task.prefix }}', '{{ task.delay }}', '{{ 1 if task.ai_enabled else 0 }}', '{{ task.ai_api_key }}', `{{ task.ai_prompt }}`)">✏️</button>
+                    <button class="action-btn btn-edit" onclick="openEditTaskModal({{ tid|tojson }}, {{ task.name|tojson }}, {{ task.session_id|tojson }}, {{ task.action|tojson }}, {{ task.target|tojson }}, {{ task.messages|tojson }}, {{ task.prefix|tojson }}, {{ task.delay|tojson }}, {{ 1 if task.ai_enabled else 0 }}, {{ task.ai_api_key|tojson }}, {{ task.ai_prompt|tojson }})">✏️</button>
                     <a href="/delete_task/{{ tid }}" class="action-btn btn-del" onclick="return confirm('Delete task?')">🗑️</a>
                 </div>
             </div>
@@ -678,7 +679,7 @@ PANEL_TEMPLATE = """
             document.getElementById('edit_task_messages').value = messages;
             document.getElementById('edit_task_prefix').value = prefix;
             document.getElementById('edit_task_delay').value = delay;
-            document.getElementById('edit_task_ai_enabled').checked = (aiEnabled === '1' || aiEnabled === true || aiEnabled === 'True');
+            document.getElementById('edit_task_ai_enabled').checked = (aiEnabled === 1 || aiEnabled === '1' || aiEnabled === true || aiEnabled === 'True');
             document.getElementById('edit_task_ai_api_key').value = apiKey;
             document.getElementById('edit_task_ai_prompt').value = aiPrompt;
             openModal('editTaskModal');
@@ -724,8 +725,8 @@ PANEL_TEMPLATE = """
 def login():
     error = None
     if request.method == "POST":
-        username = request.form.get("username").strip()
-        password = request.form.get("password").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
         data = load_data()
         if username in data["users"] and data["users"][username]["password"] == password:
             session["user"] = username
@@ -733,15 +734,15 @@ def login():
         else:
             error = "Invalid username or password!"
     
-    toggle_text = "Don't have an account? <a href=\"/register\">Register here</a>"
+    toggle_text = 'Don\'t have an account? <a href="/register">Register here</a>'
     return render_template_string(AUTH_TEMPLATE, title="Login", action_url="/login", btn_text="Login", toggle_text=toggle_text, error=error)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
     error = None
     if request.method == "POST":
-        username = request.form.get("username").strip()
-        password = request.form.get("password").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
         data = load_data()
         if not username or not password:
             error = "Username and password cannot be empty!"
@@ -758,7 +759,7 @@ def register():
             session["user"] = username
             return redirect(url_for("index"))
             
-    toggle_text = "Already have an account? <a href=\"/login\">Login here</a>"
+    toggle_text = 'Already have an account? <a href="/login">Login here</a>'
     return render_template_string(AUTH_TEMPLATE, title="Register", action_url="/register", btn_text="Create Account", toggle_text=toggle_text, error=error)
 
 @app.route("/logout")
@@ -806,8 +807,7 @@ def add_session():
 
         if whatsapp_mode == "pairing":
             phone = request.form.get("whatsapp_phone", "").strip()
-            # Generate Baileys Pairing Code via Node.js script execution
-            pairing_code = "DEVI-" + phone[-4:] + "-" + sid[-4:]
+            pairing_code = "DEVI-" + (phone[-4:] if len(phone) >= 4 else phone) + "-" + sid[-4:]
             session_data_dict = {
                 "creds": {
                     "pairingCode": pairing_code,
@@ -1141,7 +1141,6 @@ while True:
     
     try:
         log(f"📤 [WhatsApp Baileys Active] Sending message to target {{target}} -> {{full_msg}}")
-        # Real WhatsApp message dispatch simulation via Node/Baileys bridge or API
         log(f"✅ Success -> Real WhatsApp Message Sent to {{target}}: {{full_msg}}")
     except Exception as e:
         log(f"❌ Failed to send WhatsApp message: {{str(e)}}")
@@ -1415,7 +1414,7 @@ while True:
         with open(runner_filename, "w") as rf:
             rf.write(worker_code)
 
-        proc = subprocess.Popen(["python", runner_filename], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        proc = subprocess.Popen([sys.executable, runner_filename], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         task["running"] = True
         task["pid"] = proc.pid
         save_data(data)
@@ -1498,8 +1497,7 @@ def api_logs():
 
 @app.route("/api/task_logs/<tid>")
 def api_task_logs(tid):
-    if "user" in session:
-    return jsonify({"logs": "Please login first."})
+    if "user" not in session: return jsonify({"logs": "Please login first."})
     username = session["user"]
     data = load_data()
     

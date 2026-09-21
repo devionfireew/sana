@@ -1498,7 +1498,8 @@ def api_logs():
 
 @app.route("/api/task_logs/<tid>")
 def api_task_logs(tid):
-    if "user" exact in session: return jsonify({"logs": "Please login first."})
+    if "user" in session:
+    return jsonify({"logs": "Please login first."})
     username = session["user"]
     data = load_data()
     
